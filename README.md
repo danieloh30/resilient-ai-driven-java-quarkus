@@ -221,6 +221,8 @@ export OPENAI_API_KEY=sk-...
 
 ### Demo UI
 
+![Demo UI — all 4 steps visible, Step 2 showing a live OpenAI response in the Activity Log](docs/demo-ui.png)
+
 Open **[http://localhost:8080](http://localhost:8080)** in your browser.
 
 The single-page UI walks through all 4 steps interactively — no `curl` required:
