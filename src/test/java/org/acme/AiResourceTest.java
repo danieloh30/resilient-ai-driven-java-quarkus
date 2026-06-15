@@ -10,7 +10,6 @@ import org.mockito.Mockito;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.notNullValue;
 
 @QuarkusTest
 class AiResourceTest {
@@ -75,31 +74,6 @@ class AiResourceTest {
                 .statusCode(200)
                 .body("answer", containsString("unable to process"))
                 .body("source", is("fallback"));
-    }
-
-    @Test
-    void testCodeReviewSuccess() {
-        Mockito.when(aiAssistant.reviewCode(Mockito.anyString()))
-                .thenReturn("The code looks clean. Consider adding error handling.");
-
-        given()
-                .contentType(ContentType.JSON)
-                .body("{\"code\": \"public void hello() { System.out.println(\\\"hi\\\"); }\"}")
-                .when().post("/api/ai/review")
-                .then()
-                .statusCode(200)
-                .body("answer", notNullValue())
-                .body("source", is("openai"));
-    }
-
-    @Test
-    void testCodeReviewValidationBlank() {
-        given()
-                .contentType(ContentType.JSON)
-                .body("{\"code\": \"\"}")
-                .when().post("/api/ai/review")
-                .then()
-                .statusCode(400);
     }
 
     @Test

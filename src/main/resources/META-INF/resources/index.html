@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resilient AI · Quarkus Demo</title>
+  <style>
+    /* ── reset & tokens ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --border:    #30363d;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --blue:      #58a6ff;
+      --green:     #3fb950;
+      --red:       #f85149;
+      --orange:    #d29922;
+      --purple:    #bc8cff;
+      --step1:     #58a6ff;
+      --step2:     #bc8cff;
+      --step3:     #f85149;
+      --step4:     #3fb950;
+      --radius:    8px;
+      --mono:      'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ── layout ─────────────────────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header .logo { font-size: 22px; }
+    header h1 { font-size: 16px; font-weight: 600; color: var(--text); }
+    header p  { font-size: 12px; color: var(--muted); }
+
+    .badge {
+      margin-left: auto;
+      display: flex;
+      gap: 6px;
+    }
+    .badge span {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-weight: 600;
+      background: var(--border);
+      color: var(--muted);
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 0;
+      height: calc(100vh - 69px);
+    }
+
+    .steps-panel {
+      overflow-y: auto;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .log-panel {
+      border-left: 1px solid var(--border);
+      background: #0a0e13;
+      display: flex;
+      flex-direction: column;
+    }
+    .log-panel header {
+      border-bottom: 1px solid var(--border);
+      padding: 10px 14px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: var(--surface);
+    }
+    .log-panel header .log-actions { margin-left: auto; display: flex; gap: 8px; }
+    .log-panel header button {
+      font-size: 10px;
+      background: var(--border);
+      border: none;
+      color: var(--muted);
+      padding: 2px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .log-panel header button:hover { background: #444c56; color: var(--text); }
+
+    #log {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 14px;
+      font-family: var(--mono);
+      font-size: 11.5px;
+      line-height: 1.7;
+    }
+
+    /* ── step card ──────────────────────────────────────────────────── */
+    .step-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: border-color .2s;
+    }
+    .step-card.active   { border-color: var(--step-color, var(--blue)); }
+    .step-card.done     { border-color: var(--green); opacity: .85; }
+
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .step-number {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 13px;
+      background: var(--step-color, var(--blue));
+      color: #000;
+      flex-shrink: 0;
+    }
+    .step-title   { font-weight: 600; font-size: 14px; flex: 1; }
+    .step-subtitle { font-size: 11px; color: var(--muted); }
+    .step-chevron  { color: var(--muted); font-size: 12px; transition: transform .2s; }
+    .step-card.open .step-chevron { transform: rotate(180deg); }
+
+    .step-body {
+      padding: 0 16px;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height .3s ease, padding .3s;
+    }
+    .step-card.open .step-body { max-height: 1000px; padding: 0 16px 16px; }
+
+    .step-desc { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+
+    /* ── input rows ─────────────────────────────────────────────────── */
+    .input-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+    .input-row label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+    .input-row textarea,
+    .input-row input {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 8px 10px;
+      resize: vertical;
+      outline: none;
+      width: 100%;
+    }
+    .input-row textarea:focus,
+    .input-row input:focus  { border-color: var(--blue); }
+
+    /* ── buttons ────────────────────────────────────────────────────── */
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    button.btn {
+      border: none; border-radius: var(--radius);
+      font-size: 12px; font-weight: 600;
+      padding: 7px 14px; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 5px;
+      transition: opacity .15s, transform .1s;
+    }
+    button.btn:active { transform: scale(.97); }
+    button.btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-primary  { background: var(--blue);   color: #000; }
+    .btn-danger   { background: var(--red);    color: #fff; }
+    .btn-success  { background: var(--green);  color: #000; }
+    .btn-neutral  { background: var(--border); color: var(--text); }
+
+    /* ── response box ───────────────────────────────────────────────── */
+    .response-box {
+      margin-top: 12px;
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      font-family: var(--mono);
+      font-size: 11.5px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 60px;
+      color: var(--muted);
+      transition: border-color .2s;
+    }
+    .response-box.ok       { border-color: var(--green); color: var(--green); }
+    .response-box.fallback { border-color: var(--orange); color: var(--orange); }
+    .response-box.error    { border-color: var(--red);    color: var(--red); }
+    .response-box.info     { border-color: var(--blue);   color: var(--blue); }
+
+    /* ── fault status pill ──────────────────────────────────────────── */
+    #fault-status-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 700;
+      background: var(--border); color: var(--muted);
+      transition: background .3s, color .3s;
+    }
+    #fault-status-badge.on  { background: #3d1a1a; color: var(--red); }
+    #fault-status-badge.off { background: #1a2d1a; color: var(--green); }
+    #fault-status-badge::before { content: '●'; }
+
+    /* ── log colours ────────────────────────────────────────────────── */
+    .log-line   { display: block; }
+    .log-ts     { color: #444c56; }
+    .log-ok     { color: var(--green); }
+    .log-warn   { color: var(--orange); }
+    .log-err    { color: var(--red); }
+    .log-info   { color: var(--blue); }
+    .log-label  { color: var(--purple); font-weight: 600; }
+
+    /* ── misc ────────────────────────────────────────────────────────── */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+    .pill { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; }
+    .pill-step1 { background:#1a2b3d; color:var(--step1); }
+    .pill-step2 { background:#2a1f3d; color:var(--step2); }
+    .pill-step3 { background:#3d1a1a; color:var(--step3); }
+    .pill-step4 { background:#1a2d1a; color:var(--step4); }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    @media (max-width: 700px) {
+      main { grid-template-columns: 1fr; }
+      .log-panel { height: 220px; border-left: none; border-top: 1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">⚡</span>
+  <div>
+    <h1>Resilient AI-Driven Java · Quarkus</h1>
+    <p>Java Agent Demo — follow the 4 steps live</p>
+  </div>
+  <div class="badge">
+    <span>quarkus-langchain4j</span>
+    <span>smallrye-fault-tolerance</span>
+    <span id="fault-status-badge" class="off">FAULT OFF</span>
+  </div>
+</header>
+
+<main>
+  <!-- ════════════ STEPS PANEL ════════════ -->
+  <section class="steps-panel">
+
+    <!-- ── STEP 1 ── Bootstrap & Scaffold ───────────────────────────── -->
+    <div class="step-card open" id="card-1" style="--step-color:var(--step1)">
+      <div class="step-header" onclick="toggle(1)">
+        <div class="step-number" style="background:var(--step1)">1</div>
+        <div style="flex:1">
+          <div class="step-title">Bootstrap &amp; Scaffold <span class="pill pill-step1">quarkus_create</span></div>
+          <div class="step-subtitle">Verify the app is up and the skeleton is responding</div>
+        </div>
+        <span class="step-chevron">▼</span>
+      </div>
+      <div class="step-body">
+        <p class="step-desc">
+          Bob called <code>quarkus_create</code> to initialise the project directory, generate
+          the Maven wrapper, and auto-start the app in <strong>dev mode</strong>.
+          Hit <em>Ping</em> to confirm the scaffold is live.
+        </p>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="doPing()">▶ Ping the service</button>
+        </div>
+        <div class="response-box" id="resp-ping">Waiting…</div>
+      </div>
+    </div>
+
+    <!-- ── STEP 2 ── Dependency Injection ───────────────────────────── -->
+    <div class="step-card" id="card-2" style="--step-color:var(--step2)">
+      <div class="step-header" onclick="toggle(2)">
+        <div class="step-number" style="background:var(--step2)">2</div>
+        <div style="flex:1">
+          <div class="step-title">Dependency Injection <span class="pill pill-step2">LangChain4j + Fault Tolerance</span></div>
+          <div class="step-subtitle">Bob adds extensions and calls the live AI</div>
+        </div>
+        <span class="step-chevron">▼</span>
+      </div>
+      <div class="step-body">
+        <p class="step-desc">
+          Bob autonomously added <code>quarkus-langchain4j-openai</code> and
+          <code>quarkus-smallrye-fault-tolerance</code> — no manual <code>pom.xml</code>
+          editing. Ask the AI a question to confirm both extensions are live.
+        </p>
+
+        <div class="input-row">
+          <label>Chat question</label>
+          <textarea id="chat-input" rows="2" placeholder="e.g. What are the benefits of Quarkus for AI workloads?">What are the benefits of using Quarkus for AI workloads?</textarea>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="doChat()">▶ Send to AI</button>
+        </div>
+        <div class="response-box" id="resp-chat">Waiting…</div>
+      </div>
+    </div>
+
+    <!-- ── STEP 3 ── Fault Simulation ───────────────────────────────── -->
+    <div class="step-card" id="card-3" style="--step-color:var(--step3)">
+      <div class="step-header" onclick="toggle(3)">
+        <div class="step-number" style="background:var(--step3)">3</div>
+        <div style="flex:1">
+          <div class="step-title">Fault Simulation <span class="pill pill-step3">POST /api/fault/enable</span></div>
+          <div class="step-subtitle">Intentionally crash the external AI API</div>
+        </div>
+        <span class="step-chevron">▼</span>
+      </div>
+      <div class="step-body">
+        <p class="step-desc">
+          Enable the runtime crash toggle — every AI call will now throw a
+          <code>RuntimeException</code> simulating an OpenAI outage. Watch the
+          fault-tolerance chain fire: <strong>Retry → CircuitBreaker → Fallback</strong>.
+        </p>
+
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+          <span>Current state:</span>
+          <span id="fault-status-badge-2" class="off" style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">● FAULT OFF</span>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-danger"   onclick="enableFault()">💥 Enable fault simulation</button>
+          <button class="btn btn-success"  onclick="disableFault()">✅ Disable &amp; heal</button>
+          <button class="btn btn-neutral"  onclick="checkFaultStatus()">⟳ Refresh status</button>
+        </div>
+        <div class="response-box" id="resp-fault">Waiting…</div>
+
+        <hr class="divider" />
+
+        <p class="step-desc" style="margin-top:4px">
+          Now fire a chat request with fault <strong>ON</strong> — you'll get HTTP 200
+          with <code>"source":"fallback"</code>, never a raw 500:
+        </p>
+        <div class="input-row">
+          <label>Test question while fault is active</label>
+          <textarea id="chat-fault-input" rows="2">What is fault tolerance?</textarea>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-danger" onclick="doChatFault()">💥 Send (fault active)</button>
+        </div>
+        <div class="response-box" id="resp-chat-fault">Waiting…</div>
+      </div>
+    </div>
+
+    <!-- ── STEP 4 ── Self-Healing ────────────────────────────────────── -->
+    <div class="step-card" id="card-4" style="--step-color:var(--step4)">
+      <div class="step-header" onclick="toggle(4)">
+        <div class="step-number" style="background:var(--step4)">4</div>
+        <div style="flex:1">
+          <div class="step-title">Self-Healing <span class="pill pill-step4">@Fallback + CircuitBreaker</span></div>
+          <div class="step-subtitle">Bob's fallback catches the error — zero 500s reach the client</div>
+        </div>
+        <span class="step-chevron">▼</span>
+      </div>
+      <div class="step-body">
+        <p class="step-desc">
+          Disable fault simulation. The circuit breaker closes after 2 healthy responses.
+          The <code>@Fallback</code> method Bob wrote ensures callers always get
+          a well-formed JSON response — never an unhandled exception.
+        </p>
+
+        <div class="btn-row">
+          <button class="btn btn-success"  onclick="disableFault()">✅ Disable fault &amp; restore</button>
+        </div>
+        <div class="response-box" id="resp-heal">Waiting…</div>
+
+        <hr class="divider" />
+
+        <div class="input-row">
+          <label>Confirm recovery — send a normal chat</label>
+          <textarea id="chat-heal-input" rows="2">Tell me about SmallRye Fault Tolerance circuit breaker</textarea>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-success" onclick="doChatHeal()">▶ Send (should return "source":"openai")</button>
+        </div>
+        <div class="response-box" id="resp-chat-heal">Waiting…</div>
+
+        <hr class="divider" />
+
+        <p class="step-desc" style="margin-top:4px">Health check — confirm everything is UP:</p>
+        <div class="btn-row">
+          <button class="btn btn-neutral" onclick="doHealth()">🩺 Health check</button>
+        </div>
+        <div class="response-box" id="resp-health">Waiting…</div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ════════════ LOG PANEL ════════════ -->
+  <aside class="log-panel">
+    <header>
+      Activity log
+      <div class="log-actions">
+        <button onclick="clearLog()">Clear</button>
+      </div>
+    </header>
+    <div id="log"></div>
+  </aside>
+</main>
+
+<script>
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+function ts() {
+  return new Date().toLocaleTimeString('en-GB', { hour12: false });
+}
+
+function log(level, msg) {
+  const el = document.getElementById('log');
+  const cls = { ok:'log-ok', warn:'log-warn', err:'log-err', info:'log-info' }[level] || '';
+  const line = document.createElement('span');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="log-ts">[${ts()}]</span> <span class="${cls}">${msg}</span>\n`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+function clearLog() { document.getElementById('log').innerHTML = ''; }
+
+function setBox(id, text, cls) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'response-box ' + (cls || '');
+}
+
+function toggle(n) {
+  const card = document.getElementById('card-' + n);
+  card.classList.toggle('open');
+}
+
+function updateFaultBadges(on) {
+  const label = on ? 'FAULT ON' : 'FAULT OFF';
+  const cls   = on ? 'on' : 'off';
+  ['fault-status-badge', 'fault-status-badge-2'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = '● ' + label;
+    el.className = cls;
+    // inline style for the second badge which doesn't share the header CSS
+    if (id === 'fault-status-badge-2') {
+      el.style.background = on ? '#3d1a1a' : '#1a2d1a';
+      el.style.color = on ? 'var(--red)' : 'var(--green)';
+    }
+  });
+}
+
+async function apiFetch(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const res = await fetch(path, opts);
+  const ct  = res.headers.get('content-type') || '';
+  const data = ct.includes('json') ? await res.json() : await res.text();
+  return { ok: res.ok, status: res.status, data };
+}
+
+function prettyJson(data) {
+  return typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+}
+
+// ── Step 1 ────────────────────────────────────────────────────────────────────
+
+async function doPing() {
+  log('info', 'GET /api/ai/ping');
+  try {
+    const { ok, data } = await apiFetch('GET', '/api/ai/ping');
+    if (ok) {
+      setBox('resp-ping', data, 'ok');
+      log('ok', '✓ Service is up — scaffold healthy');
+      document.getElementById('card-1').classList.add('done');
+    } else {
+      setBox('resp-ping', data, 'error');
+      log('err', '✗ Ping failed');
+    }
+  } catch (e) {
+    setBox('resp-ping', 'Network error: ' + e.message, 'error');
+    log('err', '✗ Network error: ' + e.message);
+  }
+}
+
+// ── Step 2 ────────────────────────────────────────────────────────────────────
+
+async function doChat() {
+  const question = document.getElementById('chat-input').value.trim();
+  if (!question) return;
+  log('info', 'POST /api/ai/chat — "' + question.slice(0, 60) + '…"');
+  setBox('resp-chat', 'Calling AI…', '');
+  try {
+    const { ok, data } = await apiFetch('POST', '/api/ai/chat', { question });
+    const txt = prettyJson(data);
+    if (ok && data.source === 'openai') {
+      setBox('resp-chat', txt, 'ok');
+      log('ok', '✓ AI responded (source: openai)');
+    } else if (ok && data.source === 'fallback') {
+      setBox('resp-chat', txt, 'fallback');
+      log('warn', '⚠ Fallback returned — fault simulation may be active');
+    } else {
+      setBox('resp-chat', txt, 'error');
+      log('err', '✗ Unexpected response');
+    }
+  } catch (e) {
+    setBox('resp-chat', 'Network error: ' + e.message, 'error');
+    log('err', '✗ ' + e.message);
+  }
+}
+
+// ── Step 3 ────────────────────────────────────────────────────────────────────
+
+async function enableFault() {
+  log('warn', 'POST /api/fault/enable — activating simulated crash…');
+  try {
+    const { ok, data } = await apiFetch('POST', '/api/fault/enable');
+    setBox('resp-fault', prettyJson(data), ok ? 'error' : 'error');
+    if (ok) {
+      updateFaultBadges(true);
+      log('warn', '💥 Fault simulation ENABLED — AI calls will throw RuntimeException');
+      log('info', '→ Now click "Send (fault active)" to observe the fallback chain');
+    }
+  } catch (e) {
+    setBox('resp-fault', 'Network error: ' + e.message, 'error');
+    log('err', '✗ ' + e.message);
+  }
+}
+
+async function disableFault() {
+  log('info', 'DELETE /api/fault/disable — restoring normal operation…');
+  try {
+    const { ok, data } = await apiFetch('DELETE', '/api/fault/disable');
+    const box = document.querySelector('#card-4 .response-box') || document.getElementById('resp-heal');
+    setBox('resp-heal', prettyJson(data), ok ? 'ok' : 'error');
+    if (ok) {
+      updateFaultBadges(false);
+      log('ok', '✅ Fault simulation DISABLED — circuit will heal after 2 healthy responses');
+    }
+  } catch (e) {
+    setBox('resp-heal', 'Network error: ' + e.message, 'error');
+    log('err', '✗ ' + e.message);
+  }
+}
+
+async function checkFaultStatus() {
+  try {
+    const { ok, data } = await apiFetch('GET', '/api/fault/status');
+    setBox('resp-fault', prettyJson(data), 'info');
+    const on = data && data.faultSimulation === 'ENABLED';
+    updateFaultBadges(on);
+    log('info', '⟳ Fault status: ' + (on ? 'ENABLED' : 'DISABLED'));
+  } catch (e) {
+    log('err', '✗ Status check failed: ' + e.message);
+  }
+}
+
+async function doChatFault() {
+  const question = document.getElementById('chat-fault-input').value.trim();
+  if (!question) return;
+  log('warn', '💥 POST /api/ai/chat (fault ON) — expecting fallback…');
+  setBox('resp-chat-fault', 'Sending… watch for fallback response', '');
+  try {
+    const { ok, data } = await apiFetch('POST', '/api/ai/chat', { question });
+    const txt = prettyJson(data);
+    if (ok && data.source === 'fallback') {
+      setBox('resp-chat-fault', txt, 'fallback');
+      log('warn', '⚠ [SELF-HEAL] chatFallback fired — HTTP 200 with source:fallback');
+      log('ok',   '✓ No 500 reached the client — fault tolerance is working');
+    } else if (ok && data.source === 'openai') {
+      setBox('resp-chat-fault', txt, 'ok');
+      log('ok', '✓ OpenAI responded (fault may be OFF — check status)');
+    } else {
+      setBox('resp-chat-fault', txt, 'error');
+      log('err', '✗ Unexpected response');
+    }
+  } catch (e) {
+    setBox('resp-chat-fault', 'Network error: ' + e.message, 'error');
+    log('err', '✗ ' + e.message);
+  }
+}
+
+// ── Step 4 ────────────────────────────────────────────────────────────────────
+
+async function doChatHeal() {
+  const question = document.getElementById('chat-heal-input').value.trim();
+  if (!question) return;
+  log('info', 'POST /api/ai/chat (recovery test)…');
+  setBox('resp-chat-heal', 'Sending…', '');
+  try {
+    const { ok, data } = await apiFetch('POST', '/api/ai/chat', { question });
+    const txt = prettyJson(data);
+    if (ok && data.source === 'openai') {
+      setBox('resp-chat-heal', txt, 'ok');
+      log('ok', '✅ Recovery confirmed — source:openai returned');
+      document.getElementById('card-4').classList.add('done');
+    } else if (ok && data.source === 'fallback') {
+      setBox('resp-chat-heal', txt, 'fallback');
+      log('warn', '⚠ Still in fallback — circuit may still be open, wait ~15s and retry');
+    } else {
+      setBox('resp-chat-heal', txt, 'error');
+      log('err', '✗ Unexpected response');
+    }
+  } catch (e) {
+    setBox('resp-chat-heal', 'Network error: ' + e.message, 'error');
+    log('err', '✗ ' + e.message);
+  }
+}
+
+async function doHealth() {
+  log('info', 'GET /q/health');
+  try {
+    const { ok, data } = await apiFetch('GET', '/q/health');
+    setBox('resp-health', prettyJson(data), ok && data.status === 'UP' ? 'ok' : 'error');
+    if (data.status === 'UP') log('ok', '🩺 Health: UP');
+    else log('err', '🩺 Health: ' + data.status);
+  } catch (e) {
+    setBox('resp-health', 'Network error: ' + e.message, 'error');
+    log('err', '✗ ' + e.message);
+  }
+}
+
+// ── init ──────────────────────────────────────────────────────────────────────
+
+(async () => {
+  log('info', 'Demo UI loaded — checking fault status…');
+  await checkFaultStatus();
+  log('info', 'Start with Step 1: click "Ping the service"');
+})();
+</script>
+</body>
+</html>

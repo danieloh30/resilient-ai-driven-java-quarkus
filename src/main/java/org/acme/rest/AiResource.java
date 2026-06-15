@@ -10,7 +10,6 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import org.acme.dto.ChatRequest;
 import org.acme.dto.ChatResponse;
-import org.acme.dto.CodeReviewRequest;
 import org.acme.resilience.ResilientAiService;
 
 @Path("/api/ai")
@@ -32,11 +31,5 @@ public class AiResource {
     @Path("/chat")
     public ChatResponse chat(@Valid ChatRequest request) {
         return resilientAiService.chat(request.question);
-    }
-
-    @POST
-    @Path("/review")
-    public ChatResponse reviewCode(@Valid CodeReviewRequest request) {
-        return resilientAiService.reviewCode(request.code);
     }
 }
