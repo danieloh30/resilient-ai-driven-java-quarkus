@@ -6,6 +6,40 @@ in four repeatable steps**.
 
 ---
 
+## Replaying the Demo with Bob (empty directory)
+
+Open Bob in an **empty directory** and paste this single prompt.
+Bob will execute all four steps autonomously — no manual commands needed.
+
+```
+Build me a resilient AI-driven Java microservice using Quarkus.
+
+Requirements:
+1. Scaffold a new Quarkus project called "resilient-ai-driven-java-quarkus"
+   with REST (Jackson), health checks, and bean validation.
+2. Add the quarkus-langchain4j-openai extension and create an AiAssistant
+   interface with a chat(String question) method backed by GPT-4o-mini.
+   Use @RegisterAiService and give it a system prompt for a Quarkus demo assistant.
+3. Add the quarkus-smallrye-fault-tolerance extension and wrap every AI call
+   in a ResilientAiService bean that applies @Timeout(30s), @Retry(maxRetries=2),
+   @CircuitBreaker, and @Fallback so that callers always receive HTTP 200 — never a 500.
+4. Add a FaultSimulator bean with an AtomicBoolean toggle and expose three endpoints
+   at /api/fault: POST /enable, DELETE /disable, and GET /status. Wire the toggle
+   into ResilientAiService so enabling it forces every AI call to throw a
+   RuntimeException, exercising the full Retry → CircuitBreaker → Fallback chain.
+5. Serve a single-page demo UI at http://localhost:8080 (static HTML in
+   META-INF/resources) with four collapsible step cards matching the four steps
+   above, live API calls, colour-coded response boxes, and a real-time activity log.
+6. Write @QuarkusTest integration tests for every feature. Keep README.md updated.
+```
+
+> **Tip:** export your OpenAI key first so the app starts cleanly:
+> ```bash
+> export OPENAI_API_KEY=sk-...
+> ```
+
+---
+
 ## The 4-Step Bob Demo
 
 ### Step 1 — Bootstrap & Scaffold
